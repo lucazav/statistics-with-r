@@ -1,0 +1,459 @@
+---
+title: "Exploring the BRFSS data"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+  pdf_document: default
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+In 1984, the Centers for Disease Control and Prevention (CDC) initiated the state-based Behavioral Risk Factor Surveillance System (BRFSS)--a cross-sectional telephone survey that state health departments conduct monthly over landline telephones and cellular telephones with a standardized questionnaire and technical and methodologic assistance from CDC. Today, all 50 states, the District of Columbia, Puerto Rico, and Guam collect data annually and American Samoa, Federated States of Micronesia, and Palau collect survey data over a limited point-in-time via telephone interviews. In order to respond to the rapid rise in the proportion of U.S. households that contain only cellular telephones, BRFSS surveys have had to add cellular telephones to their samples. At the same time, new methods of weighting to adjust survey data for differences between the demographic characteristics of respondents and the target population have been adopted.
+
+This is a clear example of a *observational study* that contains both prospectively- and retrospectively-collected variables, as you can see from the variables description in the *brfss_codebook.html* file.
+
+States (or who conducts data collection for them) conduct interviews following a suggested BRFSS protocol. In order to conduct the BRFSS, states refer CDC to make sure data collection procedures are in place to follow the methodology. This is an example of *stratified sampling*, where the strata are the states (geographic stratification). For each state, the BRFSS uses two samples: one for landline telephone respondents and one for cellular telephone respondents:
+
++ *Landline sample*
+  + Disproportionate stratified sampling (DSS) has been used for the landline sample since 2003. DDS draws telephone numbers from two strata (lists) that are based on the presumed density of known telephone household numbers.
++ *Cellular sample*
+  + The sample is randomly generated from a sampling frame of confirmed cellular area code and prefix combinations.
+
+The interviews will determine eligible households and eligible household members (aged 18 years or older). For more details about the data collection, click the following link: https://www.cdc.gov/brfss/data_documentation/pdf/userguidejune2013.pdf.
+
+Since this data is collected in a random framework from the U.S. residents population (only adults, members of an eligible household):
++ we can consider the sampe as a good generalization of the selected population
++ we can safetely apply the usual statistical methods.
+
+This is not a randomized experiment, so the evidence of a naturally occurring association between variables **cannot** be confused with causal connections.
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+
+Do individuals with any diseases consider themself not having poor health?
+
+**Research quesion 2:**
+
+Do individuals that declare to be nervous, hopeless, restless, etc. not recognize these deseases as mental deseases and so they declare to not have poor mental healt?
+
+**Research quesion 3:**
+
+In common sense doing exercises is one of the most effective ways to improve your mental health.
+So the question we want to answer is the following: "May physical activity be correlated with mental healt? If yes, do more exercises a week doing healthier?"
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Research quesion 1:**
+
+*"Do individuals with any diseases consider themself not having poor health?"*
+
+Let's analyze the *poorhlth*, *menthhlth*, *physhlth* variables
+```{r message=FALSE}
+# Used to avoid scientific notation on the axis
+require(scales)
+
+brfss2013 %>%
+  ggplot(aes(poorhlth)) +
+    geom_histogram(breaks=seq(0, 30, by = 1),
+                   fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Histogram for poorhlth")
+
+brfss2013 %>%
+  ggplot(aes(menthlth)) +
+    geom_histogram(breaks=seq(0, 30, by = 1),
+                   fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Histogram for menthlth")
+
+brfss2013 %>%
+  ggplot(aes(physhlth)) +
+    geom_histogram(breaks=seq(0, 30, by = 1),
+                   fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Histogram for physhlth")
+```
+
+Since the above mentioned variables are measured in days of the previous month, we can bin the variables so that it'll be esier to deal with them. We will transform the NULLs in the "unknown" factor.
+```{r}
+brfss2013 <- brfss2013 %>%
+                        mutate(poorhlth_factor = 
+                                 factor(ifelse(is.na(poorhlth), "unknown",
+                                                 ifelse(poorhlth == 0, "no",
+                                                        ifelse(poorhlth <= 10, "low",
+                                                               ifelse(poorhlth <= 20, "medium", "high")))),
+                                        levels=c("unknown", "no","low", "medium", "high")))
+
+
+brfss2013 <- brfss2013 %>%
+  mutate(menthlth_factor = 
+           factor(ifelse(is.na(menthlth), 'unknown',
+                            ifelse(menthlth == 0, 'no',
+                                   ifelse(menthlth <= 10, 'low',
+                                          ifelse(menthlth <= 20, 'medium', 'high')))),
+                     levels=c("unknown", "no","low", "medium", "high")))
+
+
+brfss2013 <- brfss2013 %>%
+  mutate(physhlth_factor = 
+           factor(ifelse(is.na(physhlth), 'unknown',
+                            ifelse(physhlth == 0, 'no',
+                                   ifelse(physhlth <= 10, 'low',
+                                          ifelse(physhlth <= 20, 'medium', 'high')))),
+                     levels=c("unknown", "no","low", "medium", "high")))
+```
+
+Let's visualize the new binned variables.
+```{r}
+brfss2013 %>%
+  ggplot(aes(poorhlth_factor)) +
+    geom_bar(fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Barplot for poorhlth_factor") +
+    geom_text(stat = "count", aes(label=..count..), color="white", vjust = 1)
+
+brfss2013 %>%
+  ggplot(aes(physhlth_factor)) +
+    geom_bar(fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Barplot for physhlth_factor") +
+    geom_text(stat = "count", aes(label=..count..), color="white", vjust = 1)
+
+brfss2013 %>%
+  ggplot(aes(menthlth_factor)) +
+    geom_bar(fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Barplot for menthlth_factor") +
+    geom_text(stat = "count", aes(label=..count..), color="white", vjust = 1)
+
+```
+
+We first create two new variables to identify individuals who have a menatal and/or a physical desease (1 = unknown, 2 = no, 3 = low, 4 = medium, 5 = high)
+
+```{r}
+brfss2013 <- brfss2013 %>%
+  mutate(has_ment = ifelse(as.numeric(menthlth_factor) > 2, 1, 
+                           ifelse(as.numeric(menthlth_factor) == 1, NA, 0)),
+         has_phys = ifelse(as.numeric(physhlth_factor) > 2, 1,
+                           ifelse(as.numeric(menthlth_factor) == 1, NA, 0)))
+                           
+brfss2013 %>%
+  group_by(has_ment) %>%
+  summarise(count = n())
+
+brfss2013 %>%
+  group_by(has_phys) %>%
+  summarise(count = n())
+
+```
+
+It's convenient to build a specific dataset to understand who declared he hasn't poor health in the Main Survey - Section 2, but at the same time he declared to have one or both the desease. Let's start by "melting" the *poorhlth_factor*, *has_ment* and *has_phys* variables.
+```{r message=FALSE}
+library(reshape2)
+
+check_poorhlth_vs_mental_deseases <- brfss2013 %>%
+                                      select(poorhlth_factor, has_ment, has_phys) %>%
+                                      melt()
+
+str(check_poorhlth_vs_mental_deseases)
+
+head(check_poorhlth_vs_mental_deseases, 10)
+```
+
+Now, filtering all the values equal to 1, we analyze only the individuals who explicitly declared to have any mental or physical deseases in the last 30 days. Grouping them, we obtain the required data set to be plotted.
+```{r}
+check_poorhlth_vs_mental_deseases_grouped <- check_poorhlth_vs_mental_deseases %>%
+                                              filter(value == 1) %>%
+                                              group_by(poorhlth_factor, variable) %>%
+                                              summarise(count = n())
+
+check_poorhlth_vs_mental_deseases_grouped
+```
+
+If we compare the result with what they have declared for the *poothlth_factor* variable, we can answer to the first question.
+```{r}
+check_poorhlth_vs_mental_deseases_grouped %>%
+  ggplot(aes(x=poorhlth_factor, y=count, fill=variable)) +
+    geom_bar(stat="identity", position="stack") +
+    scale_fill_discrete(name="Desease Type",
+                      breaks=c("has_ment", "has_phys"),
+                      labels=c("Mental", "Physical")) +
+    geom_text(aes(label=ifelse(count >= 6000, count,"")), color="white", position=position_stack(vjust=0.5)) +
+    labs(title="Barplot for Poor Healt Levels per Desease Type")
+```
+
+Focusing our attention to the "no" value for the *poorhlth_factor*, it's evident that mental and/or physical desease is often not considered as poor helath.
+
+**Research quesion 2:**
+
+*"Do individuals that declare to be nervous, hopeless, restless, etc. not recognize these deseases as mental deseases and so they declare to not have poor mental health?"*
+
+We'll use the Optional Module 17 - Mental Illness and Stigma to try to answer to this question.
+First of all we need to create more variables to get rid of the complexity.
+```{r}
+brfss2013 <- brfss2013 %>%
+  mutate(is_nervous = ifelse(misnervs == "None", 0, 1),
+         is_hopeless = ifelse(mishopls == "None", 0, 1),
+         is_restless = ifelse(misrstls == "None", 0, 1),
+         is_depressed = ifelse(misdeprd == "None", 0, 1),
+         is_effort = ifelse(miseffrt == "None", 0, 1),
+         is_worthless = ifelse(miswtles == "None", 0, 1)
+  )
+
+# Just check one new variable
+brfss2013 %>%
+  group_by(is_nervous) %>%
+  summarise(count = n())
+```
+
+In order to analyze what kind of mental disease are part of the "no" and "unknown" values of *menthlth_factor*, we have to "pivot" (melt) our variables, to get only the ones having a value of 1 (explicitly declared by the individuals), and than group them.
+```{r message=FALSE}
+check_mental_unconscious <- brfss2013 %>%
+                        filter(poorhlth_factor != 'no' & physhlth_factor == "no" &
+                                 (menthlth_factor == "no" | menthlth_factor == 'unknown')) %>%
+                        select(menthlth_factor, is_nervous, is_hopeless, is_restless,
+                               is_depressed, is_effort, is_worthless) %>%
+                        melt()
+                        
+str(check_mental_unconscious)
+
+check_mental_unconscious_grouped <- check_mental_unconscious %>%
+                                      filter(value == 1) %>%
+                                      group_by(menthlth_factor, variable) %>%
+                                      summarise(count = n())
+
+check_mental_unconscious_grouped
+```
+
+Now it's easy to visualize this data set.
+```{r}
+check_mental_unconscious_grouped %>%
+  ggplot(aes(x=menthlth_factor,y=count,fill=variable)) +
+    geom_bar(width = 0.5, stat="identity",position="dodge") +
+    scale_fill_discrete(name="Mental Desease Type",
+                        breaks=c("is_nervous", "is_hopeless", "is_restless",
+                                 "is_depressed", "is_effort", "is_worthless"),
+                        labels=c("Nervous", "Hopeless", "Restless", "Depressed",
+                                 "Everything Was An Effort", "Worthless")) +
+    labs(title="Barplot for Mental Deseases not declared per Mental Desease Type")
+```
+
+So it's evident that there is people declaring to have not had mental deseases even if they declare to be, for example, hopeless or even depressed.
+
+**Research quesion 3:**
+
+*May physical activity be correlated with mental healt? If yes, do more exercises a week doing healthier?*
+
+Let's study the Main Survey - Section 12 - Exercise (Physical Activity).
+The variable *exerany2* tell us if any physical activities or exercises such as running, calisthenics, golf, gardening, or walking for exercise have been done.
+```{r}
+brfss2013 %>%
+  ggplot(aes(exerany2)) +
+  geom_bar(fill="blue") +
+  scale_y_continuous(labels = comma) +
+  geom_text(stat = "count", aes(label=..count..), color="white", vjust = 1) +
+  labs(title="Barplot for exerany2")
+```
+
+We can combine the *exerany2* with the *has_ment* one, defined in the previous section, grouping them and getting the number of instances.
+```{r}
+aerobic_vs_ment <- brfss2013 %>%
+  mutate(has_ment = as.factor(ifelse(!is.na(has_ment), ifelse(has_ment == 1, "Yes", "No"), NA))) %>%
+  group_by(exerany2, has_ment) %>%
+  summarise(count = n())
+
+aerobic_vs_ment
+```
+
+Now we can visualize this data in an easier way with a barplot.
+```{r}
+
+
+aerobic_vs_ment %>%
+  group_by(exerany2) %>%
+  mutate(group_sum = sum(count)) %>%
+  mutate(percent = count/group_sum) %>%
+  ggplot(aes(x=exerany2, y=percent, fill=has_ment)) +
+    geom_bar(stat="identity", position="stack") +
+    geom_text(aes(label=ifelse(percent >= 0.07, paste0(sprintf("%.0f", percent*100),"%"),"")), color="white", position=position_stack(vjust=0.5)) +
+    geom_text(aes(label=ifelse(count > 6000, paste0("(", count, ")"), "")), color="white", position=position_stack(vjust=0.95)) +
+    labs(title="Barplot for Aerobic Exercises per Mental Deseases")
+```
+
+As you can see, 34% of individuals who don't do any aerobic exericises has mental desease, whereas only 29% of individuals who do exercises has mental deseases. So we can suppose that exercises have a benefical effect to mental health.
+
+Since it seems that exercises have a benefical effect, we can study how the frequencies of aerobic exercises in a week can impact to mental health.
+
+Let's analyze the frequencies of these aerobic activities through the *exeroft1* variable.
+In its definition we can find these values:
+
++ [101 - 199] Times per week
++ [201 - 299] Times per month
+
+The first number denotes times per week (1) or month (2). The remaining digits indicate the count of times.
+
+So let's visualize its boxplot.
+```{r message=FALSE}
+fun_median <- function(x){ return(data.frame(y=median(x),label=median(x,na.rm=T))) }
+
+brfss2013 %>%
+  ggplot(aes(x="", y=exeroft1)) +
+  geom_boxplot() +
+  stat_summary(geom="text", vjust=-0.7,
+               fun.data=fun_median) +
+  labs(title="Boxplot for exeroft1")
+```
+From the above boxplot we can see that the majority of people who declared to do aerobic exercise prefer to measure it in days in a week (not in a month).
+
+Analyzing the range between 100 and 200 (not included) we can understand how many times an individual do aerobic exercises in a week.
+```{r}
+# Histogram cut to 130, just to better see the main part of the distribution
+brfss2013 %>%
+  filter(exeroft1 > 100 & exeroft1 < 200) %>%
+  ggplot(aes(exeroft1)) +
+    geom_histogram(breaks=seq(101, 130, by = 1),
+                   fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Histogram for exeroft1 range [101 - 199]")
+
+brfss2013 %>%
+  filter(exeroft1 > 100 & exeroft1 < 200) %>%
+  ggplot(aes(x="", y=exeroft1)) +
+    geom_boxplot() +
+    stat_summary(geom="text", vjust=-0.7,
+                 fun.data=fun_median) +
+    labs(title="Boxplot for the weekly range of exeroft1")
+```
+
+The median is 103, so 3 times a week.
+
+Analyzing the range between 200 and 300 (not included) we can understand how many times an individual do aerobic exercises in a month.
+```{r}
+# Histogram cut to 260, just to better see the main part of the distribution
+brfss2013 %>%
+  filter(exeroft1 > 200 & exeroft1 < 300) %>%
+  ggplot(aes(exeroft1)) +
+    geom_histogram(breaks=seq(201, 260, by = 1),
+                   fill="blue") +
+    scale_y_continuous(labels = comma) +
+    labs(title="Histogram for exeroft1 range [201 - 299]")
+
+brfss2013 %>%
+  filter(exeroft1 > 200 & exeroft1 < 300) %>%
+  ggplot(aes(x="", y=exeroft1)) +
+  geom_boxplot() +
+  stat_summary(geom="text", vjust=-0.7,
+               fun.data=fun_median) +
+  labs(title="Boxplot for the month range of exeroft1")
+```
+
+The median is 212, so 12 times a month, that is 3 times a week on average.
+
+So we can create a new variable (*exeroft1_factor*) that bins the *exeroft1* one in this way: 1 times a week is low, 2 or 3 times a week is medium, more than 3 times a week is high.
+```{r}
+brfss2013 <- brfss2013 %>%
+  mutate(exeroft1_factor = factor(ifelse(is.na(exeroft1), NA,
+                                            ifelse(exeroft1 == 0, "no",
+                                                   ifelse(exeroft1 > 100 & exeroft1 < 200,
+                                                          ifelse(exeroft1 - 100 == 1, "low",
+                                                                 ifelse(exeroft1 - 100 <= 3, "medium", "high")
+                                                          ),
+                                                          ifelse(exeroft1 > 200 & exeroft1 < 300,
+                                                                 ifelse( (exeroft1 - 200) / 4 < 2, "low",
+                                                                         ifelse( (exeroft1 - 200) / 4 <= 3, "medium", "high")
+                                                                 ),
+                                                                 NA
+                                                          )
+                                                   )
+                                            )
+                                      ),
+                                  levels=c("no","low", "medium", "high")))
+
+brfss2013 %>%
+  ggplot(aes(exeroft1_factor)) +
+  geom_bar(fill="blue") +
+  scale_y_continuous(labels = comma) +
+  geom_text(stat = "count", aes(label=..count..), color="white", vjust = 1) +
+  labs(title="Barplot for exeroft1_factor")
+```
+
+It makes sense to visualize this variable related to the *exerany2* one, since *exeroft1* values should be related only to the "Yes" value of *exerany2*. First we need to group and summarize our values.
+```{r}
+aerobic <- brfss2013 %>%
+  group_by(exerany2, exeroft1_factor) %>%
+  summarise(count = n())
+
+aerobic
+```
+
+Then we can plot this data set with a barplot.
+```{r}
+aerobic %>%
+  mutate(exeroft1_factor = factor(exeroft1_factor, levels = levels(addNA(exeroft1_factor)),
+                                  labels = c(levels(exeroft1_factor), "undefined"), exclude = NULL)) %>%
+  ggplot(aes(x=exerany2, y=count, fill=exeroft1_factor)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_y_continuous(labels = comma) +
+  scale_fill_discrete(name="Desease Type",
+                      breaks=c("no", "low", "medium", "high", "undefined"),
+                      labels=c("No exercises", "1 days a week", "2 or 3 days a week",
+                               "More than 3 days a week", "Undefined")) +
+  geom_text(aes(label=count), color="black", position = position_dodge(1)) +
+  labs(title="Barplot for Who Declare to do Exercises per Exercises Frequency (exeroft1_factor)")
+```
+As you can see, all the frequency colored bars are associated to the "Yes" answere to the *exerany2* variable, whereas all the NA frequencies ("Undefined" in cyan) are spit into the "No" and NA answers to the *exerany2* variable. There is the only exception of the "No exercise" bar (in red, but not visibe, since there is only 1 one occurrence of it) for the NA answer. Obviously it is form filling error.
+
+Finally we can combine the *exeroft1_factor* variable with the *has_ment* one, grouping them and getting the number of instances.
+```{r}
+aerobic_freq_vs_ment <- brfss2013 %>%
+  mutate(has_ment = as.factor(ifelse(!is.na(has_ment), ifelse(has_ment == 1, "Yes", "No"), NA))) %>%
+  filter(exeroft1_factor != "no") %>% # Get rid of the "no" value, since it is a mistake
+  group_by(exeroft1_factor, has_ment) %>%
+  summarise(count = n())
+
+aerobic_freq_vs_ment
+```
+
+For a better understanding of the data, we can plot the data set in a barplot.
+```{r}
+aerobic_freq_vs_ment %>%
+  group_by(exeroft1_factor) %>%
+  mutate(group_sum = sum(count)) %>%
+  mutate(percent = count/group_sum) %>%
+  ggplot(aes(x=exeroft1_factor, y=percent, fill=has_ment)) +
+  geom_bar(stat="identity", position="stack") +
+  scale_fill_discrete(name="Has Mental Deseases") +
+  geom_text(aes(label=ifelse(percent >= 0.07, paste0(sprintf("%.0f", percent*100),"%"),"")), color="white", position=position_stack(vjust=0.5)) +
+  geom_text(aes(label=ifelse(count > 6000, paste0("(", count, ")"), "")), color="white", position=position_stack(vjust=0.95)) +
+  labs(title="Barplot for Aerobic Exercises Frequencies per Mental Deseases")
+```
+It's evident that the percentage of people with mental deseases is decreasing with the increasing of the frequency of the exercises in a week.
+
+So this study can be a clue of a possible causal relation between exercises and mental health. Only a dedicated randomized experiment can demonstrate the causal connection between them.
+ 
